@@ -1,6 +1,3 @@
-#define SIZE 256
-
-
 pid_t pid; 
 char **file;
 char **string;
@@ -64,7 +61,7 @@ retry_pipe:
   }
 
 retry_open_pipe:
-  pipe= open(s,O_CREAT|O_TRUNC,0666);
+  pipe= open(s,O_RDWR,0666);
   if(pipe < 0){
     if(errno == EINTR) goto retry_open_pipe;
     perror("errore pipe");
@@ -91,6 +88,7 @@ retry_fork:
   //figlio 
   int r;
   char buff[SIZE];
+  int w_f;
 retry_open:
    FILE* f = fopen(file[j],"w+");
    if(f == NULL ){
@@ -106,6 +104,15 @@ retry_read:
      perror("errore read pipe");
      exit(-1);
     }
+    printf("ho letto %s \n", buff);
+retry_fputs:
+    w_f =fputs(buff,f);
+    if(w_f == EOF ){
+     if(errno ==  EINTR) goto retry_fputs;
+     perror("errore fputs");
+     exit(-1);
+    }
+
    }
   }
  }
@@ -137,3 +144,6 @@ retry_write_pipe:
  }
 	return 0;
 }
+
+
+
