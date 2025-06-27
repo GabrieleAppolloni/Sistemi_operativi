@@ -1,2 +1,3 @@
 # Sistemi_operativi
-Esami svolti per la prova pratica
+Ovviamente non ne assicuro la correttezza quindi cautela, lascio le mie soluzioni delle prove di laboratorio.
+
