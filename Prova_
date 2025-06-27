@@ -1,0 +1,66 @@
+
+ifdef Posix_compile
+#include <unistd.h>
+#include <errno.h>
+#include <signal.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/mman.h>
+#include <sys/sem.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#else
+#include <windows.h>
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+pid_t pid; 
+
+
+int main(int argc, char** argv){
+ int n = argc -1;
+ int n_2 ;
+ int n_process;
+// verifico se  N > 0
+ if( argc < 5 ){
+   printf("Errore nei parametri passati \n");
+   return -1;
+ }
+ for(int i = 0 ; i<= n; i++ ){
+  if(strcmp(argv[i+1],"-s") == 0){
+    n_2 = i;
+    break;
+  }
+ }
+// printf("%d : %s \n", n_2,argv[n_2]);
+ int n_3 = (n - n_2) - 1;
+// printf("%d \n", n_3);
+ 
+ if(n_3 != (n_2 - 1)){
+   printf("Numero di file diverso dalle stringhe");
+   return -1;
+ }
+
+ n_process = n_2 -1;
+ printf("%d processi \n", n_process);
+ for(int j= 0 ; j < n_process; j++){
+  printf("i : %d \n", j);
+retry_fork:
+  pid = fork();
+  if(pid < 0) {
+   if( errno == EINTR) goto retry_fork;
+    perror("error fork: ");
+    exit(-1);
+
+  }else if(pid == 0){
+   printf("sono il figlio \n");
+  }
+ }
+ printf("sono il padre \n");
+
+	return 0;
+}
