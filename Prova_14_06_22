@@ -1,9 +1,17 @@
+
 pid_t pid; 
 char **file;
 char **string;
 int **pipes;
+char** backup;
 
 
+void gestore(int sig){
+
+
+
+
+}
 
 
 int main(int argc, char** argv){
@@ -31,19 +39,26 @@ int main(int argc, char** argv){
  pipes = malloc(sizeof(int*)*n_3);
  file = malloc(sizeof(char*)*(n_2-1));
  string = malloc(sizeof(char*)*n_3);
+ backup = malloc(sizeof(char*)*n_3); 
 
- if(file == NULL || string == NULL || pipe == NULL ){
+ if(file == NULL || string == NULL || pipe == NULL || backup == NULL ){
   perror("malloc error ");
   exit(-1);
  }
- 
+ char back[30]; 
+
  for(int k = 0; k < n_3; k++){
   string[k] = malloc(sizeof(char*));
   file[k] = malloc(sizeof(char*));
-  
+  backup[k]= malloc(sizeof(char*));
   file[k] = argv[k+2];
   string[k] = argv[argc- n_3 +k];
-  printf("il file : %s ha la stringa %s \n",file[k], string[k]);
+  //char back[20];
+  snprintf(back,strlen(back),"%s_backup",file[k]);
+  backup[k] = back;
+  printf("%s\n",back);
+
+  printf("il file : %s ha la stringa %s e backup : %s \n",file[k], string[k],backup[k]);
  }
 
  for(int y = 0 ; y < n_3 ; y++){
@@ -86,9 +101,14 @@ retry_fork:
 
   }else if(pid == 0){
   //figlio 
+  //signal(SIG_INT,gestore);
   int r;
   char buff[SIZE];
   int w_f;
+  //char back[20];
+ // snprintf(back,strlen(back),"%s_backup",file[j]);
+  
+
 retry_open:
    FILE* f = fopen(file[j],"w+");
    if(f == NULL ){
@@ -104,9 +124,10 @@ retry_read:
      perror("errore read pipe");
      exit(-1);
     }
+    buff[r]= '\0';
     printf("ho letto %s \n", buff);
 retry_fputs:
-    w_f =fputs(buff,f);
+    w_f =fprintf(f,"%s\n",buff);
     if(w_f == EOF ){
      if(errno ==  EINTR) goto retry_fputs;
      perror("errore fputs");
@@ -117,6 +138,7 @@ retry_fputs:
   }
  }
  // processo padre
+// signal(SIGINT,SIG_IGN);
  char buffer[SIZE];
  char* c;
  int w;
