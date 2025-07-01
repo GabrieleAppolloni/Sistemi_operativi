@@ -48,8 +48,10 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #include <stdlib.h>
 #include <string.h>
 #define SIZE 256
+#define KEY 15
 
-FILE* f_o[2];
+struct sembuf s_b;
+int indice;
 pid_t pid; 
 char **file;
 char **string;
@@ -61,11 +63,16 @@ void gestore(int sig){
  char* c;
  char buffer_b[SIZE];
  printf("gestore attivato copia in corso..");
+ FILE* orig = fopen(file[indice],"r");
+ FILE* dest = fopen(backup[indice],"w");
+
  do{
-  c = fgets(buffer_b,SIZE,f_o[0]);
-  fprintf(f_o[1],"%s\n",buffer_b);
+  c = fgets(buffer_b,SIZE,orig);
+  fprintf(dest,"%s\n",buffer_b);
  }while(c != NULL );
  printf("copia effettuata");
+ fclose(orig);
+ fclose(dest);
 }
 
 
@@ -73,10 +80,34 @@ int main(int argc, char** argv){
  int n = argc -1;
  int n_2 ;
  int n_process;
+ int sem;
 // verifico se  N > 0
  if( argc < 5 ){
    printf("Errore nei parametri passati \n");
    return -1;
+ }
+
+retry_mmap:
+ void* mem=mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+ if(mem == NULL){
+  if(errno == EINTR) goto retry_mmap;
+   perror("errore mmap");
+   exit(-1);
+ }
+retry_sem:
+ sem = semget(KEY,1,IPC_CREAT|0666);
+ if(sem < 0){
+  if(errno == EINTR) goto retry_sem;
+  perror("errore semget");
+  exit(-1);
+ }
+
+retry_ctl:
+ int sem_c = semctl(sem,0,SETVAL,1);
+ if(sem_c < 0){
+  if(errno == EINTR) goto retry_ctl;
+  perror("errore semctl");
+  exit(-1);
  }
 
  for(int i = 0 ; i<= n; i++ ){
@@ -108,9 +139,9 @@ int main(int argc, char** argv){
   backup[k]= malloc(sizeof(char*));
   file[k] = argv[k+2];
   string[k] = argv[argc- n_3 +k];
-  //char back[20];
+  char back[20];
   snprintf(back,sizeof(back),"%s_backup",file[k]);
-  backup[k] = back;
+  backup[k] = strdup(back);
   printf("%s\n",back);
 
   printf("il file : %s ha la stringa %s e backup : %s \n",file[k], string[k],backup[k]);
@@ -173,11 +204,9 @@ retry_open:
      exit(-1);
    }
    while(1){
-
+   indice = j;
 retry_read:
     r = read(*pipes[j],buff,SIZE);
-    f_o[0] = f;
-    f_o[1] = f_b;
     if(r < 0){
      if(errno == EINTR) goto retry_read;
      perror("errore read pipe");
@@ -193,6 +222,10 @@ retry_fputs:
      exit(-1);
     }
     fflush(f);
+    s_b.sem_num = 0;
+    s_b.sem_op = 1;
+    s_b.sem_flg = 0;
+    semop(sem,&s_b,1);
    }
   }
  }
@@ -202,6 +235,11 @@ retry_fputs:
  char* c;
  int w;
  while(1){
+    s_b.sem_num = 0;
+    s_b.sem_op = -1;
+    s_b.sem_flg = 0;
+    semop(sem,&s_b,1);
+
   c = fgets(buffer,SIZE,stdin);
   if(c == NULL){
     perror("errore fgets");
