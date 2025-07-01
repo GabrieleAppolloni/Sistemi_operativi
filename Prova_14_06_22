@@ -68,7 +68,7 @@ retry_open_pipe:
     exit(-1);
   }
   pipes[y] = malloc(sizeof(int));
-  pipes[y] = &pipe;
+  *pipes[y] = pipe;
  }
 
 
@@ -112,7 +112,7 @@ retry_fputs:
      perror("errore fputs");
      exit(-1);
     }
-
+    fflush(f);
    }
   }
  }
@@ -126,6 +126,7 @@ retry_fputs:
     perror("errore fgets");
     break;
   }
+  buffer[strcspn(buffer,"\n")] = '\0';
   //verifico che nessun processo stia lavorando 
   for(int i = 0; i < n_3; i++){
    if(strcmp(string[i],buffer) == 0){
@@ -144,6 +145,3 @@ retry_write_pipe:
  }
 	return 0;
 }
-
-
-
