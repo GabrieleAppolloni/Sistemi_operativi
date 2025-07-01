@@ -1,4 +1,55 @@
+/*Si sviluppi una applicazione che riceva tramite argv[] la seguente linea di comando
 
+    nome_prog -f file1 [file2] ... [fileN] -s stringa1 [stringa2] ... [stringaN] 
+    
+indicante N nomi di file (con N > 0) ed N ulteriori stringhe (il numero dei nomi dei 
+file specificati deve corrispondere al numero delle stringhe specificate).
+
+L'applicazione dovra' generare N processi figli concorrenti, in cui l'i-esimo di questi 
+processi effettuera' la gestione dell'i-esimo dei file identificati tramite argv[].
+Tale file dovra' essere rigenerato allo startup dell'applicazione.
+Il main thread del processo originale dovra' leggere indefinitamente stringhe da 
+standard input e dovra' comparare ogni stringa letta che le N stringhe ricevute in 
+input tramite argv[].
+Nel caso in cui la stringa letta sia uguale alla i-esima delle N stringhe ricevuta 
+in input, questa dovra' essere comunicata all'i-esimo processo figlio in modo che questo 
+la possa inserire in una linea del file di cui sta effettuando la gestione. Invece, 
+se il main thread legge una stringa non uguale ad alcuna delle N stringhe ricevute 
+in input, questa stringa dovra essere comunicata a tutti gli N processi figli
+attivi, che la dovranno scrivere sui relativi file in una nuova linea.
+
+L'applicazione dovra' gestire il segnale SIGINT (o CTRL_C_EVENT nel caso
+WinAPI) in modo tale che quando uno qualsiasi dei processi figli venga colpito 
+dovra' riportare il contenuto del file da esso correntemente gestito in un file
+con lo stesso nome ma con suffisso "_backup".  Invece il processo originale non dovra'
+terminare o eseguire alcuna attivita' in caso di segnalazione.
+
+In caso non vi sia immissione di dati sullo standard input e non vi siano segnalazioni, 
+l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della CPU.
+
+*****************************************************************/
+#ifdef Posix_compile
+#include <unistd.h>
+#include <errno.h>
+#include <signal.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/mman.h>
+#include <sys/sem.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#else
+#include <windows.h>
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define SIZE 256
+
+FILE* f_o[2];
 pid_t pid; 
 char **file;
 char **string;
@@ -7,10 +58,14 @@ char** backup;
 
 
 void gestore(int sig){
-
-
-
-
+ char* c;
+ char buffer_b[SIZE];
+ printf("gestore attivato copia in corso..");
+ do{
+  c = fgets(buffer_b,SIZE,f_o[0]);
+  fprintf(f_o[1],"%s\n",buffer_b);
+ }while(c != NULL );
+ printf("copia effettuata");
 }
 
 
@@ -54,7 +109,7 @@ int main(int argc, char** argv){
   file[k] = argv[k+2];
   string[k] = argv[argc- n_3 +k];
   //char back[20];
-  snprintf(back,strlen(back),"%s_backup",file[k]);
+  snprintf(back,sizeof(back),"%s_backup",file[k]);
   backup[k] = back;
   printf("%s\n",back);
 
@@ -101,7 +156,7 @@ retry_fork:
 
   }else if(pid == 0){
   //figlio 
-  //signal(SIG_INT,gestore);
+  signal(SIGINT,gestore);
   int r;
   char buff[SIZE];
   int w_f;
@@ -111,14 +166,18 @@ retry_fork:
 
 retry_open:
    FILE* f = fopen(file[j],"w+");
-   if(f == NULL ){
+   FILE* f_b = fopen(backup[j],"w+");
+   if(f == NULL || f_b == NULL ){
     if(errno == EINTR) goto retry_open;
      perror("errore fopen");
      exit(-1);
    }
    while(1){
+
 retry_read:
     r = read(*pipes[j],buff,SIZE);
+    f_o[0] = f;
+    f_o[1] = f_b;
     if(r < 0){
      if(errno == EINTR) goto retry_read;
      perror("errore read pipe");
@@ -138,7 +197,7 @@ retry_fputs:
   }
  }
  // processo padre
-// signal(SIGINT,SIG_IGN);
+ signal(SIGINT,SIG_IGN);
  char buffer[SIZE];
  char* c;
  int w;
