@@ -1,3 +1,4 @@
+/******************************************************************
 Welcome to the Operating System examination
 
 You are editing the '/home/esame/prog.c' file. You cannot remove 
@@ -88,12 +89,10 @@ int indice;
 pid_t pid; 
 char **file;
 char **string;
-//int **pipes;
 char** backup;
 
 
 void gestore(int signum) {
-   // if (signum != SIGINT) return;
 
     FILE *orig = fopen(file[indice],"r");
     FILE *dest = fopen(backup[indice], "w");
@@ -166,31 +165,26 @@ retry_ctl:
    printf("Numero di file diverso dalle stringhe");
    return -1;
  }
- //pipes = malloc(sizeof(int*)*n_3);
  file = malloc(sizeof(char*)*(n_2-1));
  string = malloc(sizeof(char*)*n_3);
  backup = malloc(sizeof(char*)*n_3); 
 
- if(file == NULL || string == NULL || pipe == NULL || backup == NULL ){
+ if(file == NULL || string == NULL || backup == NULL ){
   perror("malloc error ");
   exit(-1);
  }
  char back[30]; 
 
  for(int k = 0; k < n_3; k++){
-  //string[k] = malloc(sizeof(char*));
-  //file[k] = malloc(sizeof(char*));
-  //backup[k]= malloc(sizeof(char*));
   file[k] = strdup(argv[k+2]);
   string[k] = strdup(argv[argc- n_3 +k]);
- // char back[20];
   snprintf(back,sizeof(back),"%s_backup",file[k]);
   backup[k] = strdup(back);
   printf("%s\n",back);
 
   printf("il file : %s ha la stringa %s e backup : %s \n",file[k], string[k],backup[k]);
  }
- int dim = n_3 -1;
+ int dim = n_3;
  int pipes[dim][2];
 
  for(int y = 0 ; y < n_3 ; y++){
@@ -224,9 +218,6 @@ retry_fork:
   int r;
   char buff[SIZE];
   int w_f;
-  //char back[20];
- // snprintf(back,strlen(back),"%s_backup",file[j]);
-  
 
 retry_open:
    FILE* f = fopen(file[j],"w+");
@@ -237,7 +228,6 @@ retry_open:
      exit(-1);
    }
    while(1){
-   //indice = j;
 retry_read:
     r = read(pipes[j][0],buff,SIZE);
     if(r < 0){
@@ -298,6 +288,7 @@ retry_write_pipe:
     trovato = 1;
     break;
    }
+  }
    if(trovato == 0){
     for(int l = 0 ; l < dim; l++){
 retry_write_pipe_all:
@@ -308,9 +299,7 @@ retry_write_pipe_all:
        exit(-1);
      }
     }
-   }
   }
-  //sincro perchè deve attendere che il processo abbia terminato le operazioni
  }
 	return 0;
 }
