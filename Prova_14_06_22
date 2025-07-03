@@ -91,10 +91,11 @@ char **string;
 //int **pipes;
 char** backup;
 
-void gestore(int signum) {
-    if (signum != SIGINT) return;
 
-    FILE *orig = file[indice];
+void gestore(int signum) {
+   // if (signum != SIGINT) return;
+
+    FILE *orig = fopen(file[indice],"r");
     FILE *dest = fopen(backup[indice], "w");
 
     if (dest == NULL || orig == NULL) {
@@ -116,6 +117,8 @@ void gestore(int signum) {
     printf("🟢 Figlio [%d]: Backup salvato in '%s'\n", getpid(), backup[indice]);
 
 }
+
+
 
 int main(int argc, char** argv){
  int n = argc -1;
@@ -180,7 +183,7 @@ retry_ctl:
   //backup[k]= malloc(sizeof(char*));
   file[k] = strdup(argv[k+2]);
   string[k] = strdup(argv[argc- n_3 +k]);
-  char back[20];
+ // char back[20];
   snprintf(back,sizeof(back),"%s_backup",file[k]);
   backup[k] = strdup(back);
   printf("%s\n",back);
@@ -198,31 +201,6 @@ retry_pipe:
     perror("errore pipe");
     exit(-1);
   }
-
-
- /* char s[15];
- int pipe;
-
- snprintf(s,sizeof(s),"pipe%d",y);
- printf("%s \n",s);
-retry_pipe:
-  int p = mkfifo(s,0666);
-  if( p < 0 ){
-   if(errno == EINTR)goto retry_pipe;
-   perror("errore mkfifo");
-   exit(-1);
-  }
-
-retry_open_pipe:
-  pipe= open(s,O_RDWR,0666);
-  if(pipe < 0){
-    if(errno == EINTR) goto retry_open_pipe;
-    perror("errore pipe");
-    exit(-1);
-  }
-  pipes[y] = malloc(sizeof(int));
-  *pipes[y] = pipe;
-*/
  }
 
 
@@ -240,7 +218,7 @@ retry_fork:
   }else if(pid == 0){
   //figlio 
   signal(SIGINT,gestore);
-  
+   indice = j;
   close(pipes[j][1]); // chiudo pipe in scrittura
 
   int r;
@@ -259,7 +237,7 @@ retry_open:
      exit(-1);
    }
    while(1){
-   indice = j;
+   //indice = j;
 retry_read:
     r = read(pipes[j][0],buff,SIZE);
     if(r < 0){
@@ -306,6 +284,7 @@ retry_fputs:
   }
   buffer[strcspn(buffer,"\n")] = '\0';
   //verifico che nessun processo stia lavorando 
+  int trovato = 0;
   for(int i = 0; i < n_3; i++){
    if(strcmp(string[i],buffer) == 0){
     
@@ -316,12 +295,15 @@ retry_write_pipe:
       perror("errore write pipe");
       exit(-1);
     }
+    trovato = 1;
     break;
-   }else{
+   }
+   if(trovato == 0){
     for(int l = 0 ; l < dim; l++){
+retry_write_pipe_all:
       w = write(pipes[l][1],buffer,strlen(buffer));
       if(w < 0){
-       if(errno == EINTR) goto retry_write_pipe;
+       if(errno == EINTR) goto retry_write_pipe_all;
        perror("errore write pipe");
        exit(-1);
      }
