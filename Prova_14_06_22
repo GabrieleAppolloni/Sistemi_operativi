@@ -91,23 +91,31 @@ char **string;
 //int **pipes;
 char** backup;
 
+void gestore(int signum) {
+    if (signum != SIGINT) return;
 
-void gestore(int sig){
- char* c;
- char buffer_b[SIZE];
- printf("gestore attivato copia in corso..");
- FILE* orig = fopen(file[indice],"r");
- FILE* dest = fopen(backup[indice],"w");
+    FILE *orig = file[indice];
+    FILE *dest = fopen(backup[indice], "w");
 
- do{
-  c = fgets(buffer_b,SIZE,orig);
-  fprintf(dest,"%s\n",buffer_b);
- }while(c != NULL );
- printf("copia effettuata");
- fclose(orig);
- fclose(dest);
+    if (dest == NULL || orig == NULL) {
+        perror("Errore apertura file nel gestore");
+        exit(EXIT_FAILURE);
+    }
+
+    char buffer[SIZE];
+
+    // Torna all'inizio del file di origine prima di copiare
+    fseek(orig, 0, SEEK_SET);
+
+    while (fgets(buffer, SIZE, orig) != NULL) {
+        fputs(buffer, dest);
+    }
+
+    fclose(dest);
+
+    printf("🟢 Figlio [%d]: Backup salvato in '%s'\n", getpid(), backup[indice]);
+
 }
-
 
 int main(int argc, char** argv){
  int n = argc -1;
