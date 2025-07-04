@@ -91,7 +91,7 @@ char **file;
 char **string;
 char** backup;
 
-
+//non è thread safe 
 void gestore(int signum) {
 
     FILE *orig = fopen(file[indice],"r");
