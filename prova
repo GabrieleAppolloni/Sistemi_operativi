@@ -1,3 +1,4 @@
+/*
 Welcome to the Operating System examination
 
 You are editing the '/home/esame/prog.c' file. You cannot remove 
@@ -61,7 +62,7 @@ In caso non vi sia immissione di dati sullo standard input e non vi siano segnal
 l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della CPU.
 
 *****************************************************************/
-#ifdef Posix_compile
+
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
@@ -73,9 +74,6 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #include <semaphore.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#else
-#include <windows.h>
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,11 +86,11 @@ char **file;
 char **string;
 char** backup;
 void* indice;
-int pos;
+volatile sig_atomic_t flag;
 
 
 void gestore(int signum) {
- ((int*)indice)[pos] = 1; 
+ flag = 1; 
 }
 
 int main(int argc, char** argv){
@@ -202,11 +200,11 @@ retry_fork:
 
   }else if(pid == 0){
   //figlio 
-  pos = j;
+ // pos = j;
   close(pipes[j][1]); // chiudo pipe in scrittura
   signal(SIGINT,gestore);
-  if( ((int*)indice)[pos] == 1){
-    ((int*)indice)[pos] = 0;
+  if( flag == 1){
+    flag = 0;
     FILE *orig = fopen(file[j],"r");
     FILE *dest = fopen(backup[j], "w");
 
