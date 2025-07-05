@@ -80,33 +80,19 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #define SIZE 10
 #define KEY 15
 
-char** name;
 int* file;
 int fd[2];
 pid_t pid;
 void* mem;
 struct sembuf s_b;
 int n;
+void* mem_2;
+
+
+
 
 void gestore(int sig){
- int r, w;
- char buff[MAX];
-
-  for(int i = 1; i <= n; i++){
-   printf("file %s: \n",name[i]);
-   lseek(fd[i],0,SEEK_SET);
-   while(1){
-retry_read_gest:
-    r = read(file[i],buff,MAX);
-    if( r == 0){
-      break;
-    }else if( r < 0){
-     if(errno == EINTR) goto retry_read_gest;
-     perror("errore read");
-    }
-    printf("%s",buff);
-   }
-  }
+ *((int*)mem_2) = 1;
 }
 
 
@@ -119,6 +105,7 @@ int main(int argc, char** argv){
  int sem;
  int c_sem;
  int s_op;
+ int flag = 0;
 
  if(argc < 1){
   printf("errore nel numero di arg passati deve essere > o = a 1 \n");
@@ -135,7 +122,8 @@ int main(int argc, char** argv){
     }
   }
  }
- name = malloc(sizeof(char*)*n);
+
+
  file = malloc(sizeof(int)*n);
  if(file == NULL){
   perror("errore nella malloc");
@@ -144,7 +132,6 @@ int main(int argc, char** argv){
 
 
  for(int k = 1; k <= n; k++){
-  name[k] = strdup(argv[k]);
   file[k] = open(argv[k],O_CREAT|O_TRUNC|O_RDWR,0666);
   if(file[k] < 0 ){
    perror("errore open file");
@@ -161,7 +148,9 @@ int main(int argc, char** argv){
  printf("pipe %d %d \n",fd[0],fd[1]);
 
  mem = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
- if(mem == NULL ){
+ mem_2 =mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+
+ if(mem == NULL || mem_2 == NULL ){
   perror("errore mmap");
   return -1;
  }
@@ -180,14 +169,15 @@ int main(int argc, char** argv){
 
 
  *((int*)mem) = sem;
-
+ *((int*)mem_2) = flag;
 
  for(int y = 1; y <= n; y++){
   pid = fork();
   if(pid == 0){
   //figlio
    char* c;
-   int w;
+   int w,r;
+   char buff[MAX];
 
    signal(SIGINT,gestore);
    close(fd[0]);
@@ -198,6 +188,28 @@ int main(int argc, char** argv){
    s_b.sem_num = 0;
    s_b.sem_op = -1;
    s_b.sem_flg = 0;
+
+  if(*((int*)mem_2) != 0){
+   *((int*)mem_2) = 0;
+
+   for(int i = 1; i <= n; i++){
+    printf("file %s: \n",argv[i]);
+    lseek(file[i],0,SEEK_SET);
+    while(1){
+retry_read_gest:
+     r = read(file[i],buff,MAX);
+     if( r == 0){
+      break;
+     }else if( r < 0){
+      if(errno == EINTR) goto retry_read_gest;
+      perror("errore read");
+      break;
+     }
+     printf("%s",buff);
+    }
+   }
+  }
+
 
 retry_sem_op:
    s_op = semop(*((int*)mem),&s_b,1);
@@ -273,5 +285,10 @@ retry_sem_op_padre:
    }
 
  }
+ 
+  free(file);
+  munmap(mem,sizeof(int));
+  munmap(mem_2,sizeof(int));
+
 	return 0;
 }
