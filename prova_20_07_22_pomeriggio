@@ -1,3 +1,4 @@
+/******************************************************************
 Welcome to the Operating System examination
 
 You are editing the '/home/esame/prog.c' file. You cannot remove 
@@ -115,7 +116,7 @@ retry_read_gestore:
      break;
     }
 retry_write_gestore:
-    w = write(1,buff,strlen(buff)+1);
+    w = write(1,buff,r);
     if( w < 0){
      if(errno == EINTR) goto retry_write_gestore;
      perror("errore write");
@@ -272,5 +273,7 @@ retry_semop_main:
  signal(SIGINT,SIG_IGN);
  while(1);
 
+  free(file);
+  
 	return 0;
 }
