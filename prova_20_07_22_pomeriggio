@@ -167,7 +167,7 @@ retry_semop:
   }
 
 retry_write:
-  w = write(file[pointer->indice],buffer,strlen(buffer)+1);
+  w = write(file[pointer->indice],buffer,strlen(buffer));
   if(w < 0){
    if(errno == EINTR) goto retry_write;
    perror("errore write");
