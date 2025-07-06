@@ -79,7 +79,6 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 
 typedef struct{
  int indice;
- int id;
  char *s;
 }data;
 
@@ -262,7 +261,6 @@ retry_semop_main:
 
  for(int y = 0; y < n; y++){
   thread_data[y].indice = y;
-  thread_data[y].id = thread[y];
   thread_data[y].s = argv[y+1];
   c_thread =  pthread_create(&thread[y],NULL,funzione,(void*)&thread_data[y]);
   if(c_thread < 0){
