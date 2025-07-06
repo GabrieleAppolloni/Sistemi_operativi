@@ -75,10 +75,13 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #include <stdlib.h>
 #include <string.h>
 
+//sarebbe oppurtuno mettere un semaforo anche per l'accesso alla memoria condivisa in cui è il flag per il gestore, evitando race condition.
 
 #define MAX 256
 #define SIZE 10
 #define KEY 15
+
+
 
 int* file;
 int fd[2];
@@ -107,7 +110,7 @@ int main(int argc, char** argv){
  int s_op;
  int flag = 0;
 
- if(argc < 1){
+ if(argc <= 1){
   printf("errore nel numero di arg passati deve essere > o = a 1 \n");
   return -1;
  } 
