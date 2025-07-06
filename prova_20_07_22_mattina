@@ -237,8 +237,6 @@ retry_write:
        perror("errore write");
        return -1;
       }
-     
-      fsync(file[y]);
 
       printf("riportato su file %s %d : %s \n",argv[y+1],file[y],buffer);
       fflush(stdout);
