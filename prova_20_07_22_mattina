@@ -207,7 +207,7 @@ retry_read_gest:
       perror("errore read");
       break;
      }
-     printf("%s",buff);
+     write(1,buff,r); // andrebbe controllato se effettivamente la scrittura è avvenuta.
      fflush(stdout);
     }
    close(file_read);
