@@ -229,7 +229,7 @@ retry_sem_op:
      perror("Errore fgets");
      return -1;
     }
-    if(strlen(buffer) <= SIZE && buffer[strlen(buffer)-1]){
+    if(strlen(buffer) <= SIZE && buffer[strlen(buffer)-1] == '\n'){
 retry_write:
       w = write(file[y],buffer,strlen(buffer) + 1);
       if(w < 0){
