@@ -86,19 +86,23 @@ typedef struct{
 int turno;
 int* file;
 int n,sem;
-struct sembuf s_b;
 
 void* funzione(void* x){
  int c_op;
  char* c_fgets;
  char buffer[MAX];
  int w;
+ struct sembuf s_b_2;
 
  data* pointer = (data*)x;
  while(1){
   memset(buffer,0,MAX);
+ s_b_2.sem_num = turno;
+ s_b_2.sem_op = -1;
+ s_b_2.sem_flg = 0;
+
 retry_semop:
-  c_op = semop(sem,&s_b,1);
+  c_op = semop(sem,&s_b_2,1);
   if(c_op < 0){
    if(errno == EINTR) goto retry_semop;
    perror("errore semop");
@@ -121,9 +125,18 @@ retry_write:
   }
   printf("inserita la stringa: %s nel file %s \n",buffer,pointer->s);
   turno = (turno +1 ) % n;
-  s_b.sem_num = 0;
-  s_b.sem_op = turno;
-  s_b.sem_flg = 0;
+  printf("turno %d \n",turno);
+  s_b_2.sem_num = 0;
+  s_b_2.sem_op = turno;
+  s_b_2.sem_flg = 0;
+
+retry_semop_2:
+  c_op = semop(sem,&s_b_2,1);
+  if(c_op < 0){
+   if(errno == EINTR) goto retry_semop_2;
+   perror("errore semop");
+   pthread_exit(NULL);
+  }
  }
   
  pthread_exit(NULL);
@@ -134,6 +147,7 @@ retry_write:
 
 
 int main(int argc, char** argv){
+ struct sembuf s_b;
  n  = argc -1;
  pthread_t thread[n];
  int  c_thread;
@@ -187,9 +201,17 @@ int main(int argc, char** argv){
  s_b.sem_op = 1;
  s_b.sem_flg = 0;
 
+retry_semop_main:
+  c_op = semop(sem,&s_b,1);
+  if(c_op < 0){
+   if(errno == EINTR) goto retry_semop_main;
+   perror("errore semop");
+   return -1;
+  }
+
  for(int y = 0; y < n; y++){
   thread_data[y].indice = y;
-  //thread_data[y].id = thread[y];
+  thread_data[y].id = thread[y];
   thread_data[y].s = argv[y+1];
   c_thread =  pthread_create(&thread[y],NULL,funzione,(void*)&thread_data[y]);
   if(c_thread < 0){
