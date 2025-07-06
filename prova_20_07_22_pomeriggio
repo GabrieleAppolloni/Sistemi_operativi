@@ -73,26 +73,59 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #include <stdlib.h>
 #include <string.h>
 
+#define KEY 25
+#define MAX 256
+
+
 typedef struct{
  int indice;
- int lock;
+ int id;
+ char *s;
 }data;
 
 int turno;
 int* file;
-pthread_mutex_t* p_mutex;
-int n;
+int n,sem;
+struct sembuf s_b;
 
 void* funzione(void* x){
- 
- data* pointer = (data*)x;
+ int c_op;
+ char* c_fgets;
+ char buffer[MAX];
+ int w;
 
- pthread_mutex_unlock(&p_mutex[pointer->indice]);
- if ( turno == pointer->indice){
+ data* pointer = (data*)x;
+ while(1){
+  memset(buffer,0,MAX);
+retry_semop:
+  c_op = semop(sem,&s_b,1);
+  if(c_op < 0){
+   if(errno == EINTR) goto retry_semop;
+   perror("errore semop");
+   pthread_exit(NULL);
+  }
   printf("thread accede %d \n",pointer-> indice);
+  
+  c_fgets = fgets(buffer,MAX,stdin);
+  if (c_fgets == NULL){
+   perror("errore fgets");
+   pthread_exit(NULL);
+  }
+
+retry_write:
+  w = write(file[pointer->indice],buffer,strlen(buffer)+1);
+  if(w < 0){
+   if(errno == EINTR) goto retry_write;
+   perror("errore write");
+   pthread_exit(NULL);
+  }
+  printf("inserita la stringa: %s nel file %s \n",buffer,pointer->s);
   turno = (turno +1 ) % n;
+  s_b.sem_num = 0;
+  s_b.sem_op = turno;
+  s_b.sem_flg = 0;
  }
- pthread_mutex_lock(&p_mutex[pointer->indice]);
+  
  pthread_exit(NULL);
 }
 
@@ -102,13 +135,11 @@ void* funzione(void* x){
 
 int main(int argc, char** argv){
  n  = argc -1;
- pthread_mutex_t mutex[n];
  pthread_t thread[n];
  int  c_thread;
- int c_mutex;
+ int c_sem,c_op;
  data thread_data[n];
 
- p_mutex = mutex; 
  turno = 0;
  if(argc <= 1){
   printf("errore, numero di argomenti < o = a 1");
@@ -137,14 +168,30 @@ int main(int argc, char** argv){
    return -1;
   }
  }
+ 
+ sem = semget(KEY,n,IPC_CREAT|0666);
+ if(sem < 0){
+   perror("errore semget");
+   return -1;
+ }
 
+ for(int z = 0 ; z < n ; z++){
+  c_sem = semctl(sem,z,SETVAL,0);
+  if(c_sem < 0){
+   perror("errore semctl");
+   return -1;
+  }
+ }
 
+ s_b.sem_num = turno;
+ s_b.sem_op = 1;
+ s_b.sem_flg = 0;
 
  for(int y = 0; y < n; y++){
   thread_data[y].indice = y;
-  thread_data[y].lock = y;
-  c_thread  = pthread_create(&thread[y],NULL,funzione,(void*)thread_data[y]);
-  c_mutex =  pthread_mutex_init(&mutex[y],NULL);
+  //thread_data[y].id = thread[y];
+  thread_data[y].s = argv[y+1];
+  c_thread =  pthread_create(&thread[y],NULL,funzione,(void*)&thread_data[y]);
   if(c_thread < 0){
    perror("errore pthread_create");
    return -1;
