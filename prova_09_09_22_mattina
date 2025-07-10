@@ -1,3 +1,4 @@
+*****************************************************************/
 #ifdef Posix_compile
 #include <unistd.h>
 #include <errno.h>
@@ -51,21 +52,35 @@ void stampa(){
    perror("errore open");
    break;
   }
-  num = lseek(fd,SEEK_END,SEEK_SET);
+  num = lseek(fd,0,SEEK_END);
   if (num < 0){
    perror("errore lseek");
+   close(fd);
    break;
   }
-  num = lseek(fd,num-MAX,SEEK_SET);
-  if(num < 0){
-   perror("errore lseek");
-   break;
+  if(num > MAX){
+   num = lseek(fd,num-MAX,SEEK_SET);
+   if(num < 0){
+    perror("errore lseek");
+    close(fd);
+    break;
+   }
+  }else{
+   num = lseek(fd,0,SEEK_SET);
+   if(num < 0){
+    perror("errore lseek");
+    close(fd);
+    break;
+   }
+
+
   }
 retry_read:
   r = read(fd,buff,LEN);
   if(r< 0){
    if(errno == EINTR) goto retry_read;
    perror("errore read");
+   close(fd);
    break;
   }
 retry_write_3:
@@ -73,8 +88,10 @@ retry_write_3:
   if(w < 0){
    if(errno == EINTR) goto retry_write_3;
    perror("errore write");
+   close(fd);
    break;
   }
+  close(fd);
  }
 }
 
@@ -195,8 +212,8 @@ string = argv;
  while(1){
   if(flag != 0){
    flag = 0;
+   stampa();
   }
-  stampa();
  }
 
 	return 0;
