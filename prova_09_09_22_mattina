@@ -1,5 +1,3 @@
-Fatal glibc error: tpp.c:86 (__pthread_tpp_change_priority): assertion failed: previous_prio == -1 || (previous_prio >= fifo_min_prio && previous_prio <= fifo_max_prio)
-Annullato (core dump creato)
 #ifdef Posix_compile
 #include <unistd.h>
 #include <errno.h>
@@ -18,6 +16,9 @@ Annullato (core dump creato)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#define MAX 256
+#define LEN 5
+
 
 typedef struct {
 
@@ -26,20 +27,103 @@ typedef struct {
 
 }data;
 
+char** string;
+int flag = 0;
+int n; 
+int turno = 0;
 int* files;
 pthread_mutex_t* base;
 
+void gestore(int sig){
+ flag = 1;
+}
+
+void stampa(){
+ int fd;
+ int num;
+ int r,w;
+ char buff[MAX];
+ 
+
+ for(int i = 0; i < n; i++){
+  fd = open(string[i+1],O_RDONLY);
+  if(fd < 0){
+   perror("errore open");
+   break;
+  }
+  num = lseek(fd,SEEK_END,SEEK_SET);
+  if (num < 0){
+   perror("errore lseek");
+   break;
+  }
+  num = lseek(fd,num-MAX,SEEK_SET);
+  if(num < 0){
+   perror("errore lseek");
+   break;
+  }
+retry_read:
+  r = read(fd,buff,LEN);
+  if(r< 0){
+   if(errno == EINTR) goto retry_read;
+   perror("errore read");
+   break;
+  }
+retry_write_3:
+  w = write(0,buff,r);
+  if(w < 0){
+   if(errno == EINTR) goto retry_write_3;
+   perror("errore write");
+   break;
+  }
+ }
+}
+
+
+
+
 void* funzione(void* pointer){
-
+ char buffer[MAX];
  data* curr = (data*)pointer;
-  
- pthread_mutex_lock(&base[curr->indice]);
-
- printf("sono nel thread \n");
+ char* c;
+ int w;
 
 
- printf("il mio indice: %d \n",curr->indice);
- pthread_mutex_unlock(&base[(curr->indice)+1]);
+ while(1){
+   pthread_mutex_lock(&base[curr->indice]);
+
+   printf("inserire 5 caratteri: ");
+   c =  fgets(buffer,MAX,stdin);
+   if(c == NULL){
+    perror("errore fgets");
+    pthread_exit(NULL);
+   }
+   if(strlen(buffer) <= 5){
+    printf("ho letto: %s \n",buffer);
+retry_write:
+    w = write(files[curr->indice],buffer,LEN);
+    if(w < 0){
+     if(errno == EINTR) goto retry_write;
+     perror("write error");
+     pthread_exit(NULL);
+    }
+   }else{
+ 
+    printf("stringa maggiore di 5 sarà troncata \n");
+retry_write_2:
+    w = write(files[curr->indice],buffer,LEN);
+    if(w < 0){
+     if(errno == EINTR) goto retry_write_2;
+     perror("write error");
+     pthread_exit(NULL);
+    }
+
+   }
+  fflush(stdout);
+  printf("il mio indice: %d \n",curr->indice);
+  turno= (turno + 1) % n;
+  pthread_mutex_unlock(&base[turno]);
+ }
+
 
  pthread_exit(NULL);
 
@@ -50,12 +134,13 @@ void* funzione(void* pointer){
 
 int main(int argc, char** argv){
 
-int n = argc -1;
+ n = argc -1;
 pthread_t thread[n];
 int c_thread;
 data d_thread[n];
 pthread_mutex_t mutex[n];
 int c_mutex;
+string = argv;
 
  if(n < 1){
   printf("errore numero dei file non valido \n");
@@ -105,8 +190,14 @@ int c_mutex;
  }
  
  
+ signal(SIGINT,gestore);
  
- while(1);
+ while(1){
+  if(flag != 0){
+   flag = 0;
+  }
+  stampa();
+ }
 
 	return 0;
 }
