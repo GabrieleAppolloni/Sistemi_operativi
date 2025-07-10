@@ -82,7 +82,6 @@ typedef struct {
 char** string;
 int flag = 0;
 int n; 
-int turno = 0;
 int* files;
 pthread_mutex_t* base;
 
@@ -194,10 +193,10 @@ retry_write_2:
    }
   fflush(stdout);
   printf("il mio indice: %d \n",curr->indice);
-  turno= (turno + 1) % n;
+  //turno= (turno + 1) % n;
 retry_mutex_unlock:
 
-  c =  pthread_mutex_unlock(&base[turno]);
+  c =  pthread_mutex_unlock(&base[((curr->indice)+1)%n]);
   if(c != 0){
    if(errno == EINTR) goto retry_mutex_unlock;
    perror("errore unlock mutex");
@@ -235,7 +234,7 @@ string = argv;
  }
 
  for( int i = 0; i < n; i++){
-  files[i] = open(argv[i+1],O_CREAT|O_WRONLY,0666);
+  files[i] = open(argv[i+1],O_CREAT|O_TRUNC|O_WRONLY,0666);
   if( files[i] < 0){
    perror("errore open");
    return -1;
@@ -274,6 +273,7 @@ string = argv;
  signal(SIGINT,gestore);
  
  while(1){
+  pause();
   if(flag != 0){
    flag = 0;
    stampa();
