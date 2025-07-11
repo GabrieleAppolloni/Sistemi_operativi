@@ -182,14 +182,12 @@ int c_op;
   return -1;
 
  }
- string = malloc(sizeof(char*)*n);
+ string = argv;
  fd = malloc(sizeof(int)*n);
- if(fd == NULL || string == NULL){
+ if(fd == NULL ){
    perror("erroore malloc");
    return -1;
   }
-  
-  string = argv;
 
  for(int i = 0 ; i< n; i++){
   fd[i] = open(argv[i+1],O_CREAT|O_TRUNC|O_WRONLY,0666);
