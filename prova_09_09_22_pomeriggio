@@ -74,7 +74,11 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #define KEY 25
 #define MAX 256
 #define LEN 5
-#define clear_stdin() while(getchar() != '\n');
+#define clear_stdin() \
+do{ \
+ int ch; \
+ while( (ch = getchar()) != '\n' && ch != EOF); \
+ }while(0)
 //read da stdin file 1
 
 char** string;
@@ -144,7 +148,7 @@ retry_read_g_2:
 
 
 retry_write_g:
-    w_g = write(0,buffer,r_g);
+    w_g = write(1,buffer,r_g);
    if( w_g < 0){
     if(errno == EINTR) goto retry_write_g;
     perror("errore write");
@@ -240,7 +244,7 @@ retry_access:
    fflush(stdout);
  
 retry_read:
-   r = read(1,buff,LEN);
+   r = read(0,buff,LEN);
    if( r < 0){
     if(errno == EINTR) goto retry_read;
     perror("errore read");
