@@ -147,6 +147,7 @@ retry_read_g_2:
   }
 
 
+  printf("\n");
 retry_write_g:
     w_g = write(1,buffer,r_g);
    if( w_g < 0){
@@ -155,6 +156,8 @@ retry_write_g:
     close(local_fd);
     break;
    }
+   printf("\n");
+   fflush(stdout);
 
   close(local_fd);
  } 
@@ -197,7 +200,7 @@ int c_op;
  }
  
  mem = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
- if(mem == NULL){
+ if(mem == MAP_FAILED){
   return -1;
  }
 
@@ -259,7 +262,7 @@ retry_write:
     return -1;
    }
 
-   clear_stdin();
+   if (r >= LEN) clear_stdin();
 
 
    s_b.sem_num = (j+1) % n;
