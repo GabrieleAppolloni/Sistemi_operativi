@@ -163,7 +163,8 @@ int main(int argc, char** argv){
    for(int k = 0; k < n; k++){
     if(k != j){
      close(pipes[k][0]);
-    }else if(k != j+1){
+    }
+    if(k != j+1){
      close(pipes[k][1]);
     }
 
