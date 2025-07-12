@@ -80,20 +80,10 @@ di lavoro della CPU.
 int count = 0;
 int n;
 char** string;
-void* mem;
-void* m_sem;
-struct sembuf s_b;
-
-
-void stampa(){
- printf("il conunter : %d \n",count);
- fflush(stdout);
-
-}
-
 
 void gestore(int sig){
-  *((int*)mem) = 1;
+ printf("il conunter : %d \n",count);
+ fflush(stdout);
 }
 
 int main(int argc, char** argv){
@@ -105,9 +95,6 @@ int main(int argc, char** argv){
  char buffer[MAX];
  int w,r;
  char* c;
- int sem;
- int flag = 0;
- int c_sem;
 
  string = argv;
 
@@ -115,31 +102,7 @@ int main(int argc, char** argv){
   printf("errore, numero stringhe minore di 1 \n");
   return -1;
  }
- 
- mem = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
- m_sem = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
 
- if(m_sem == MAP_FAILED || mem == MAP_FAILED){
-   perror("errore mmap");
-   return -1;
-  }
-  
-  *((int*)mem) = flag;
-  
-  sem = semget(KEY,1,IPC_CREAT|0666);
-  if (sem < 0){
-   perror("errore sem");
-   return -1;
-  }
-
-  c_sem = semctl(sem,0,SETVAL,1);
-  if(c_sem < 0){
-    perror("errore semctl");
-    return -1;
-  }
-
- *((int*)m_sem) = sem;
- 
  for(int i  =0 ; i < n; i++){
   c_pipes = pipe(pipes[i]);
   if( c_pipes < 0 ){
@@ -160,6 +123,7 @@ int main(int argc, char** argv){
    int c_op; 
   
    signal(SIGINT,gestore);
+
    for(int k = 0; k < n; k++){
     if(k != j){
      close(pipes[k][0]);
@@ -175,37 +139,7 @@ int main(int argc, char** argv){
      }
     }
   // printf("sono il figlio %d la mia stringa : %s \n ", j, string[j+1]);
-
-   while(1){
- 
-   s_b.sem_num = 0;
-   s_b.sem_op = -1;
-   s_b.sem_flg = 0;
-
-retry_acc:
-  c_op = semop(*((int*)m_sem),&s_b,1);
-  if(c_op < 0){
-   if(errno == EINTR) goto retry_acc;
-   perror("errore semop");
-   return -1;
-  }
-  if(*((int*)mem) != 0){
-   *((int*)mem) = 0;
-   stampa();
-  }
-
-  s_b.sem_num = 0;
-   s_b.sem_op = 1;
-   s_b.sem_flg = 0;
-
-retry_exit:
-  c_op = semop(*((int*)m_sem),&s_b,1);
-  if(c_op < 0){
-   if(errno == EINTR) goto retry_exit;
-   perror("errore semop");
-   return -1;
-  }
-
+  while(1){
     memset(buffer,0,MAX);
 retry_read:
     r = read(pipes[j][0],buffer,MAX);
@@ -228,6 +162,7 @@ retry_write_2:
        return -1;
        }
      }
+     if(strcmp(buffer,"skip") == 0 ) break;
     }else{
      if( j != n-1){
 retry_write:
@@ -240,7 +175,7 @@ retry_write:
      }
     }
    fflush(stdout);
-   }
+  }
   }
  
    return 1;
