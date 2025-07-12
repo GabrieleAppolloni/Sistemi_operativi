@@ -77,6 +77,8 @@ di lavoro della CPU.
 #define KEY 25
 #define clear_stdin() while(getchar () != '\n')
 
+
+//durante l'esecuzione, se il confronta ha susccesso è necessario scrivere un'ulteriore carattere a causa dell'ultima pipe che si blocca, non riesco a risolverlo.
 int count = 0;
 int n;
 char** string;
