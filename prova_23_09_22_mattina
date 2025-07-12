@@ -74,11 +74,27 @@ di lavoro della CPU.
 #include <stdlib.h>
 #include <string.h>
 #define MAX 256
+#define KEY 25
 #define clear_stdin() while(getchar () != '\n')
 
+int count = 0;
 int n;
 char** string;
+void* mem;
+void* m_sem;
+struct sembuf s_b;
 
+
+void stampa(){
+ printf("il conunter : %d \n",count);
+ fflush(stdout);
+
+}
+
+
+void gestore(int sig){
+  *((int*)mem) = 1;
+}
 
 int main(int argc, char** argv){
 
@@ -89,6 +105,9 @@ int main(int argc, char** argv){
  char buffer[MAX];
  int w,r;
  char* c;
+ int sem;
+ int flag = 0;
+ int c_sem;
 
  string = argv;
 
@@ -96,7 +115,31 @@ int main(int argc, char** argv){
   printf("errore, numero stringhe minore di 1 \n");
   return -1;
  }
+ 
+ mem = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+ m_sem = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
 
+ if(m_sem == MAP_FAILED || mem == MAP_FAILED){
+   perror("errore mmap");
+   return -1;
+  }
+  
+  *((int*)mem) = flag;
+  
+  sem = semget(KEY,1,IPC_CREAT|0666);
+  if (sem < 0){
+   perror("errore sem");
+   return -1;
+  }
+
+  c_sem = semctl(sem,0,SETVAL,1);
+  if(c_sem < 0){
+    perror("errore semctl");
+    return -1;
+  }
+
+ *((int*)m_sem) = sem;
+ 
  for(int i  =0 ; i < n; i++){
   c_pipes = pipe(pipes[i]);
   if( c_pipes < 0 ){
@@ -114,25 +157,55 @@ int main(int argc, char** argv){
 
   }else if(pid == 0){ //figlio
    //mantengo canali di lettura del precedente e scrittura al successivo 
+   int c_op; 
   
-   int count = 0;
-
+   signal(SIGINT,gestore);
    for(int k = 0; k < n; k++){
-    if(k == j-1){
+    if(k != j){
      close(pipes[k][0]);
-    }else if(k == j+1){
-     close(pipes[k][1]);
-    }else{
-     close(pipes[k][0]);
+    }else if(k != j+1){
      close(pipes[k][1]);
     }
 
   // printf("sono il figlio %d la mia stringa : %s \n ", j, string[j+1]);
 
    while(1){
+ 
+   s_b.sem_num = 0;
+   s_b.sem_op = -1;
+   s_b.sem_flg = 0;
+
+retry_acc:
+  c_op = semop(*((int*)m_sem),&s_b,1);
+  if(c_op < 0){
+   if(errno == EINTR) goto retry_acc;
+   perror("errore semop");
+   return -1;
+  }
+  if(*((int*)mem) != 0){
+   *((int*)mem) = 0;
+   stampa();
+  }
+
+  s_b.sem_num = 0;
+   s_b.sem_op = 1;
+   s_b.sem_flg = 0;
+
+retry_exit:
+  c_op = semop(*((int*)m_sem),&s_b,1);
+  if(c_op < 0){
+   if(errno == EINTR) goto retry_exit;
+   perror("errore semop");
+   return -1;
+  }
+
+
+
+
+
     memset(buffer,0,MAX);
 retry_read:
-    r = read(pipes[j][1],buffer,MAX);
+    r = read(pipes[j][0],buffer,MAX);
     if( r < 0){
      if(errno == EINTR) goto retry_read;
      perror("errore read");
@@ -145,7 +218,7 @@ retry_read:
     }else{
      if( j != n-1){
 retry_write:
-     w = write(pipes[j+1][0],buffer,r);
+     w = write(pipes[j+1][1],buffer,r);
      if(w <0){
       if(errno == EINTR) goto retry_write;
       perror("errore write");
@@ -168,7 +241,7 @@ retry_write:
   close(pipes[x][0]);
   close(pipes[x][1]);
  }
-
+ signal(SIGINT,SIG_IGN);
  while(1){
   printf("inserire una stringa: ");
   c = fgets(buffer,MAX,stdin);
@@ -176,7 +249,7 @@ retry_write:
    perror("errore fgets");
    return -1;
   }
-
+  buffer[strlen(buffer)-1] = '\0';
 retry_write_main:
   w = write(pipes[0][1],buffer,strlen(buffer));
   if( w < 0 ){
