@@ -167,7 +167,13 @@ int main(int argc, char** argv){
     if(k != j+1){
      close(pipes[k][1]);
     }
-
+ 
+    if(j == n-1){
+     for (int y = 0; y < n; y++){
+      if( y != j ) close(pipes[y][0]);
+      close(pipes[y][1]);
+     }
+    }
   // printf("sono il figlio %d la mia stringa : %s \n ", j, string[j+1]);
 
    while(1){
@@ -200,10 +206,6 @@ retry_exit:
    return -1;
   }
 
-
-
-
-
     memset(buffer,0,MAX);
 retry_read:
     r = read(pipes[j][0],buffer,MAX);
@@ -212,10 +214,20 @@ retry_read:
      perror("errore read");
      return -1;
     }
+
     if(strcmp(string[j+1],buffer) == 0){
      printf("ho trovato la stringa %s \n",string[j+1]);
      count++;
-
+     strcpy(buffer,"skip");
+     if(j != n-1){
+retry_write_2:
+      w = write(pipes[j+1][1],buffer,strlen(buffer)+1);
+      if(w <0){
+       if(errno == EINTR) goto retry_write_2;
+       perror("errore write");
+       return -1;
+       }
+     }
     }else{
      if( j != n-1){
 retry_write:
