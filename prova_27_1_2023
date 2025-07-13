@@ -169,7 +169,7 @@ void* funzione(void *x){
  snprintf(name,sizeof(name),"THREAD_%d",pos);
  //printf("%s \n",name);
  
- fd[pos] = open(name,O_CREAT|O_TRUNC|O_WRONLY,0666);
+ fd[pos] = open(name,O_CREAT|O_TRUNC|O_RDWR,0666);
  if(fd[pos] < 0){
   perror("errore open");
   pthread_exit(NULL);
