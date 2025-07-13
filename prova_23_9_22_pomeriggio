@@ -76,6 +76,7 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #define KEY_3 35
 #define MAX 256
 
+
 typedef struct {
 
 int indice;
@@ -88,17 +89,28 @@ char buffer[MAX];
 int sem_w,sem_r;
 int sem_thread;
 int n;
+int flag = 0;
+int* pointer;
+
+
+void gestore(int sig){
+ flag = 1;
+}
+
 
 void* funzione(void* struttura){
- int counter = 0;
+
  int next = 0;
  int control;
  int x;
  int posizione;
 
+ signal(SIGINT,gestore);
+
  data* curr = (data*)struttura;
  posizione = curr->indice;
-
+ pointer[posizione] = 0;
+ 
  while(1){
   s_b.sem_num = posizione;
   s_b.sem_op = -1;
@@ -112,6 +124,17 @@ retry_access:
    perror("errore semop");
    pthread_exit(NULL);
   }
+
+  if(flag != 0){
+   flag = 0;
+   for(int k = 0; k< n; k++){
+    printf(" il counter: %d \n", pointer[k]);
+   }
+  }
+
+
+
+
   if (posizione == 0){
    s_b.sem_num = 0;
    s_b.sem_op = -1;
@@ -131,7 +154,8 @@ retry_can_init:
 
   printf("thread %d creato \n", curr->indice);
   if(strcmp(string[posizione+1],buffer) == 0){
-   counter++;
+   pointer[posizione]+= 1;
+   printf("counter %d \n",pointer[posizione]);
    x = n - posizione;
    
    s_b.sem_num = 0;
@@ -160,33 +184,34 @@ retry_restart:
     perror("errore semop");
     pthread_exit(NULL);
    }
-  }
+  }else{
 
-  s_b.sem_num = 0;
-  s_b.sem_op = 1;
-  s_b.sem_flg = 0;
+   s_b.sem_num = 0;
+   s_b.sem_op = 1;
+   s_b.sem_flg = 0;
  
 retry_done:
-  control= semop(sem_w,&s_b,1);
- 
-  if(control < 0){
-   if(errno == EINTR) goto retry_done;
-   perror("errore semop");
-   pthread_exit(NULL);
-  }
+   control= semop(sem_w,&s_b,1);
+  
+   if(control < 0){
+    if(errno == EINTR) goto retry_done;
+    perror("errore semop");
+    pthread_exit(NULL);
+   }
 
-  next = (posizione +1) %n; 
-  s_b.sem_num = next;
-  s_b.sem_op = 1;
-  s_b.sem_flg = 0;
+   next = (posizione +1) %n; 
+   s_b.sem_num = next;
+   s_b.sem_op = 1;
+   s_b.sem_flg = 0;
  
 retry_next:
-  control = semop(sem_thread,&s_b,1);
+   control = semop(sem_thread,&s_b,1);
  
-  if(control < 0){
-   if(errno == EINTR) goto retry_next;
-   perror("errore semop");
-   pthread_exit(NULL);
+   if(control < 0){
+    if(errno == EINTR) goto retry_next;
+    perror("errore semop");
+    pthread_exit(NULL);
+   }
   }
  }
 
@@ -202,9 +227,9 @@ int main(int argc, char** argv){
  data d_thread[n];
  int c_s;
  char* c;
+ int counter[n];
  
- 
-
+ pointer = counter;
 
  if(n < 1){
    printf("numero stringhe minore di 1 \n");
@@ -212,7 +237,7 @@ int main(int argc, char** argv){
   }
   string = argv;
 
-  sem_w = (KEY,1,IPC_CREAT|0666);
+  sem_w = semget(KEY,1,IPC_CREAT|0666);
   sem_thread = semget(KEY_2,n,IPC_CREAT|0666);
   sem_r = semget(KEY_3,1,IPC_CREAT|0666);
 
@@ -220,7 +245,7 @@ int main(int argc, char** argv){
    perror("errore semget");
    return -1;
   }
-  printf("pippo");
+  
   c_s = semctl(sem_r,0,SETVAL,0);
   if(c_s < 0){
    perror("errore semctl");
@@ -250,56 +275,3 @@ int main(int argc, char** argv){
   }
  }
  
- 
- s_b.sem_num = 0;
- s_b.sem_op = 1;
- s_b.sem_flg = 0;
- 
-retry_sem:
- c_s = semop(sem_thread,&s_b,1);
-
- if(c_s < 0){
-  if(errno == EINTR) goto retry_sem;
-  perror("errore semop");
-  return -1;
- }
-
-
- while(1){
-
-  s_b.sem_num = 0;
-  s_b.sem_op = -n;
-  s_b.sem_flg = 0;
- 
-retry_can_write:
-  c_s = semop(sem_w,&s_b,1);
- 
-  if(c_s < 0){
-   if(errno == EINTR) goto retry_can_write;
-   perror("errore semop");
-   return -1;
-  }
-  printf("inserire stringa: ");
- 
-  c = fgets(buffer,MAX,stdin);
-  if(c == NULL){
-   perror("errore fgets");
-   return -1;
-  }
-  buffer[strlen(buffer)-1] = '\0';
-
-  s_b.sem_num = 0;
-  s_b.sem_op = 1;
-  s_b.sem_flg = 0;
- 
-retry_can_read:
-  c_s = semop(sem_r,&s_b,1);
- 
-  if(c_s < 0){
-   if(errno == EINTR) goto retry_can_read;
-   perror("errore semop");
-   return -1;
-  }
- }
-	return 0;
-}
