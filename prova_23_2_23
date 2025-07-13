@@ -89,7 +89,8 @@ char buffer[MAX];
 int fd;
 int n;
 char* caratteri;
-pthread_mutex_t* m,m_2;
+pthread_mutex_t* m;
+pthread_mutex_t* m_2;
 void* funzione(void* str){
  char my_char;
  int pos;
@@ -111,15 +112,13 @@ try_access:
 
   printf("il thread %d con : %c \n",pos,my_char);
 
- if(pos == 0){
 retry_restart:
-  c = pthread_mutex_lock(&m_2);
+  c = pthread_mutex_unlock(&m_2[pos]);
   if(c < 0){
    if(errno == EINTR) goto retry_restart;
    perror("errore unlock");
    pthread_exit(NULL);
   }
- }
 
 try_exit:
   c = pthread_mutex_unlock(&m[(pos+1)%n]);
@@ -142,7 +141,7 @@ int main(int argc, char** argv){
  pthread_t thread[n];
  int c_thread;
  data d_thread[n];
- pthread_mutex_t mutex[n],mutex_start;
+ pthread_mutex_t mutex[n], mutex_start[n];
  int c_mutex;
  char* c_gets;
   
@@ -175,14 +174,13 @@ int main(int argc, char** argv){
   perror("errore open");
   return -1;
  }
- c_mutex = pthread_mutex_init(&mutex_start,NULL);
+/* c_mutex = pthread_mutex_init(&mutex_start,NULL);
  if( c_mutex < 0){
   perror("errore init");
   return -1;
  }
  
  m_2 = mutex_start;
-
 retry_lock_start:
  c_mutex = pthread_mutex_lock(&mutex_start);
  if (c_mutex < 0){
@@ -190,13 +188,19 @@ retry_lock_start:
   perror("errore lock");
   return -1;
  }
-
+*/
  for(int x = 0; x < n; x++){
   c_mutex = pthread_mutex_init(&mutex[x],NULL);
   if(c_mutex < 0){
    perror("errore init mutex");
    return -1;
   }
+ c_mutex = pthread_mutex_init(&mutex_start[x],NULL);
+ if( c_mutex < 0){
+  perror("errore init");
+  return -1;
+ }
+
  }
 
  for(int z = 1; z < n; z++){
@@ -207,8 +211,19 @@ retry_lock_main:
    perror("errore lock");
    return -1;
   }
+/*
+retry_lock_start:
+  c_mutex = pthread_mutex_lock(&mutex_start[z]);
+  if (c_mutex < 0){
+   if(errno == EINTR) goto retry_lock_start;
+   perror("errore lock");
+   return -1;
+  }
+*/
  }
+
   m = mutex;
+  m_2 = mutex_start;
 
  for(int y = 0; y < n; y++){
   d_thread[y].indice = y;
@@ -221,14 +236,15 @@ retry_lock_main:
 
  while(1){
    
+  for(int t = 0; t < n; t++){
 retry_start:
-  c_mutex = pthread_mutex_unlock(&mutex_start);
+  c_mutex = pthread_mutex_lock(&mutex_start[t]);
   if(c_mutex <0 ){
    if(errno == EINTR) goto retry_start;
    perror("errore lock");
    break;
   }
-
+ }
    printf("inserire testo: ");
    c_gets = fgets(buffer,MAX,stdin);
    if( c_gets == NULL){
