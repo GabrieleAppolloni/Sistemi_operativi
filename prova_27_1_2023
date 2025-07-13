@@ -74,6 +74,7 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #include <stdlib.h>
 #include <string.h>
 
+//bug sulla stampa del gestore, dal secondo segnale ricevuto la stampa è mischiata, i byte non seguono l'ordine
 #define clear_stdin() while(getchar() != '\n')
 #define MAX 256
 
