@@ -85,12 +85,15 @@ typedef struct{
 }data;
 
 
+int ready = 0;
 char buffer[MAX];
 int fd;
 int n;
 char* caratteri;
 pthread_mutex_t* m;
 pthread_mutex_t* m_2;
+
+
 void* funzione(void* str){
  char my_char;
  int pos;
@@ -102,6 +105,7 @@ void* funzione(void* str){
  my_char = caratteri[pos];
  
  while(1){
+
 try_access:
   c = pthread_mutex_lock(&m[pos]);
   if(c < 0){
@@ -110,16 +114,18 @@ try_access:
    pthread_exit(NULL);
   }
 
-  printf("il thread %d con : %c \n",pos,my_char);
+ // printf("il thread %d con : %c \n",pos,my_char);
 
 retry_restart:
-  c = pthread_mutex_unlock(&m_2[pos]);
+  c = pthread_mutex_lock(&m_2[pos]);
   if(c < 0){
    if(errno == EINTR) goto retry_restart;
    perror("errore unlock");
    pthread_exit(NULL);
   }
 
+  printf("il thread %d con : %c \n",pos,my_char);
+  sleep(1);
 try_exit:
   c = pthread_mutex_unlock(&m[(pos+1)%n]);
   if(c < 0){
@@ -174,21 +180,7 @@ int main(int argc, char** argv){
   perror("errore open");
   return -1;
  }
-/* c_mutex = pthread_mutex_init(&mutex_start,NULL);
- if( c_mutex < 0){
-  perror("errore init");
-  return -1;
- }
- 
- m_2 = mutex_start;
-retry_lock_start:
- c_mutex = pthread_mutex_lock(&mutex_start);
- if (c_mutex < 0){
-  if(errno == EINTR) goto retry_lock_start;
-  perror("errore lock");
-  return -1;
- }
-*/
+
  for(int x = 0; x < n; x++){
   c_mutex = pthread_mutex_init(&mutex[x],NULL);
   if(c_mutex < 0){
@@ -203,7 +195,8 @@ retry_lock_start:
 
  }
 
- for(int z = 1; z < n; z++){
+ for(int z = 0; z < n; z++){
+ if(z > 0){
 retry_lock_main:
   c_mutex = pthread_mutex_lock(&mutex[z]);
   if( c_mutex < 0){
@@ -211,7 +204,7 @@ retry_lock_main:
    perror("errore lock");
    return -1;
   }
-/*
+ }
 retry_lock_start:
   c_mutex = pthread_mutex_lock(&mutex_start[z]);
   if (c_mutex < 0){
@@ -219,7 +212,6 @@ retry_lock_start:
    perror("errore lock");
    return -1;
   }
-*/
  }
 
   m = mutex;
@@ -246,6 +238,7 @@ retry_start:
   }
  }
    printf("inserire testo: ");
+   fflush(stdout);
    c_gets = fgets(buffer,MAX,stdin);
    if( c_gets == NULL){
      perror("errore fgtes");
