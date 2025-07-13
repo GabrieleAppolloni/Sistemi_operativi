@@ -166,7 +166,7 @@ void* funzione(void *x){
  
  //printf("thread %d \n",pos);
  
- snprintf(name,sizeof(name),"THREAD_%d",pos);
+ snprintf(name,sizeof(name),"output_%d",pos);
  //printf("%s \n",name);
  
  fd[pos] = open(name,O_CREAT|O_TRUNC|O_RDWR,0666);
@@ -194,7 +194,7 @@ retry_access:
 retry_read:
  r = read(0,buffer,n_byte);
  if(r < 0){
-  if(errno = EINTR) goto retry_read;
+  if(errno == EINTR) goto retry_read;
   perror("errore read");
   pthread_exit(NULL);
  }
