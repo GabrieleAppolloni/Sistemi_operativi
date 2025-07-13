@@ -91,11 +91,6 @@ int* fd;
 pthread_mutex_t* pointer;
 int flag = 0;
 
-void gestore(int sig){
-
- flag = 1;
-
-}
 
 void stampa(){
  int turno = 0;
@@ -148,6 +143,12 @@ retry_write_2:
    }
  }
 
+}
+
+void gestore(int sig){
+
+ //flag = 1;
+ stampa();
 }
 
 
@@ -280,14 +281,14 @@ retry_mutex:
  }
 
 
-  //signal(SIGINT,gestore);
+  signal(SIGINT,gestore);
 
   while(1){
    pause();
-   if(flag != 0){
+  /* if(flag != 0){
     flag = 0;
     stampa();
-   }
+   }*/
   }
 	return 0;
 }
