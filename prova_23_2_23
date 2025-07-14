@@ -76,205 +76,298 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #include <stdlib.h>
 #include <string.h>
 
+#define clear_stdin() while(getchar() != '\n' ) 
 #define MAX 256
+#define KEY 25
+#define KEY_2 15
+#define KEY_3 35
 
 typedef struct{
- 
+
  int indice;
 
 }data;
 
-
-int ready = 0;
-char buffer[MAX];
 int fd;
+struct sembuf s_b;
+int sem_thread;
+int sem_done;
+int sem_start;
 int n;
-char* caratteri;
-pthread_mutex_t* m;
-pthread_mutex_t* m_2;
-pthread_mutex_t* m_3;
-
-void* funzione(void* str){
- char my_char;
- int pos;
- int c;
+char buffer[MAX];
+char* carattere;
+int flag;
 
 
- data* curr = (data*)str;
- pos = curr->indice;
- my_char = caratteri[pos];
- 
+void gestore(int sig){
+  flag = 1;
+}
+
+void stampa(){
+  FILE* f;
+  char b[MAX];
+  int w;
+  char* s_2;
+
+  f = fopen("output.txt","r");
+  if(f == NULL){
+   perror("errore fopen");
+   return;
+  }
+
+  do{
+     s_2 = fgets(b,MAX,f);
+     for(int i = 0; i < strlen(b); i++){
+      if(b[i] == '*'){
+retry_w:
+        w = write(1,b,strlen(b)+1);
+        if(w < 0){
+         if(errno == EINTR) goto retry_w;
+         perror("errore write");
+         return;
+        }
+        break;
+      }
+     }
+   }while( s_2 != NULL);
+
+  printf("gestore attivo \n");
+  fflush(stdout);
+
+  fclose(f);
+}
+void* funzione(void* x){
+ int c_2;
+ data* curr = (data*)x;
+ int pos = curr->indice;
+ char buff[MAX];
+ int w;
+
  while(1){
-try_access:
-  c = pthread_mutex_lock(&m[pos]);
-  if(c < 0){
-   if(errno == EINTR) goto try_access;
-   perror("errore lock");
+  s_b.sem_num = pos;
+  s_b.sem_op = -1;
+  s_b.sem_flg = 0;
+
+retry_access:
+  c_2 = semop(sem_thread,&s_b,1);
+  if(c_2 < 0){
+   if(errno == EINTR) goto retry_access;
+   perror("errore semop");
    pthread_exit(NULL);
   }
 
- if(pos == 0){
-try_:
-  c = pthread_mutex_unlock(m_3);
-  if(c < 0){
-   if(errno == EINTR) goto try_;
-   perror("errore lock");
-   pthread_exit(NULL);
-  }
- }
- // printf("il thread %d con : %c \n",pos,my_char);
+  if(pos == 0){
+
+   s_b.sem_num = 0;
+   s_b.sem_op = -1;
+   s_b.sem_flg = 0;
 
 retry_restart:
-  c = pthread_mutex_lock(&m_2[pos]);
-  if(c < 0){
-   if(errno == EINTR) goto retry_restart;
-   perror("errore unlock");
+   c_2 = semop(sem_start,&s_b,1);
+   if( c_2 < 0){
+    if(errno == EINTR) goto retry_restart;
+    perror("errore semop");
+    pthread_exit(NULL);
+   }
+  }
+
+
+  printf("sono il thread %d con carattere: %c \n",pos,carattere[pos]);
+  strcpy(buff,buffer);
+  printf("ho letto %s \n",buff);
+  fflush(stdout);
+
+  for(int i = 0; i < (strlen(buff)); i++){
+   if(buff[i] == carattere[pos] ) buff[i] = '*';
+  }
+
+  printf("la nuova stringa: %s \n",buff);
+
+retry_write:
+  w = write(fd,buff,strlen(buff)+1);
+  if(w < 0){
+   if(errno == EINTR) goto retry_write;
+    perror("errore write");
+    pthread_exit(NULL);
+  }
+
+retry_write_2:
+  w = write(fd,buffer,strlen(buffer)+1);
+  if(w < 0){
+   if(errno == EINTR) goto retry_write;
+    perror("errore write");
+    pthread_exit(NULL);
+  }
+
+
+  s_b.sem_num = 0;
+  s_b.sem_op = 1;
+  s_b.sem_flg = 0;
+
+retry_add:
+  c_2 = semop(sem_done,&s_b,1);
+  if(c_2 < 0){
+   if(errno == EINTR) goto retry_add;
+   perror("errore semop");
    pthread_exit(NULL);
   }
 
-  printf("il thread %d con : %c \n",pos,my_char);
- // sleep(1);
 
-try_exit:
-  c = pthread_mutex_unlock(&m[(pos+1)%n]);
-  if(c < 0){
-   if(errno == EINTR) goto try_exit;
-   perror("errore unlock");
-   pthread_exit(NULL);
-  }
- }
+
+  s_b.sem_num = (pos+1)%n;
+  s_b.sem_op = 1;
+  s_b.sem_flg = 0;
  
+ 
+retry_exit:
+  c_2 = semop(sem_thread,&s_b,1);
+  if(c_2 <0){
+   if(errno == EINTR) goto retry_exit;
+   perror("errore semop");
+   pthread_exit(NULL);
+  } 
+ }
  pthread_exit(NULL);
 
 }
 
 
+
+
 int main(int argc, char** argv){
 
- n = argc -1;
- char array[n];
+ n= argc -1;
  pthread_t thread[n];
- int c_thread;
  data d_thread[n];
- pthread_mutex_t mutex[n], mutex_start[n],mutex_go;
- int c_mutex;
- char* c_gets;
-  
+ int c;
+ char* s;
+ char array[n];
 
-
- if(n < 1){
-  printf("errore numero argomenti uguale a 0 \n");
+ if( n < 1){
+  printf("numero di argomenti minore di 0 \n");
   return -1;
  }
- for(int i = 1; i <= n-1; i++){
-  for(int j = i+1; j <= n ; j++){
-  // printf("%s %s \n",argv[i],argv[j]);
-   if(strcmp(argv[i],argv[j]) == 0 || strlen(argv[i]) > 1 || strlen(argv[j]) > 1){
-    // printf("errore caratteri uguali \n");
-     return -1;
 
+ for(int i = 1; i <=  n-1; i++){
+  for(int j = i+1; j <= n; j++){
+   // printf("%s %s \n",argv[i],argv[j]);
+    if(strcmp(argv[i],argv[j]) == 0){
+     printf("argomenti uguali \n");
+     return -1;
     }
   }
- } 
- for(int k = 0; k < n; k++){
-   array[k] = *argv[k+1];
-  // printf("%c \n", array[k]);
  }
-
-
- caratteri = array;
-
+ 
  fd = open("output.txt",O_CREAT|O_TRUNC|O_RDWR,0666);
  if(fd < 0){
   perror("errore open");
   return -1;
  }
 
-c_mutex = pthread_mutex_init(&mutex_go,NULL);
-  if(c_mutex < 0){
-   perror("errore init mutex");
+
+ sem_thread = semget(KEY,n,IPC_CREAT|0666);
+ sem_done =semget(KEY_2,1,IPC_CREAT|0666);
+ sem_start = semget(KEY_3,1,IPC_CREAT|0666);
+
+ if( sem_thread < 0 || sem_done < 0 || sem_start < 0 ){
+  perror("errore semget");
+  return -1;
+ }
+
+ c = semctl(sem_start,0,SETVAL,0); 
+ if(c < 0){
+   perror("errore semctl");
    return -1;
   }
 
-retry_i:
-  c_mutex = pthread_mutex_lock(&mutex_go);
-  if( c_mutex < 0){
-   if(errno == EINTR) goto retry_i;
-   perror("errore lock");
-   return -1;
-  }
-  m_3 = &mutex_go;
+ c = semctl(sem_done,0,SETVAL,0);
+ if (c < 0){
+  perror("errore semctl");
+  return -1;
+ }
 
- for(int x = 0; x < n; x++){
-  c_mutex = pthread_mutex_init(&mutex[x],NULL);
-  if(c_mutex < 0){
-   perror("errore init mutex");
+ for(int z = 1; z < n; z++){
+  c = semctl(sem_thread,z,SETVAL,0);
+  if( c < 0){
+   perror("errore semctl");
    return -1;
   }
-  c_mutex = pthread_mutex_init(&mutex_start[x],NULL);
-  if( c_mutex < 0){
-   perror("errore init");
-   return -1;
-  } 
+ }
+ 
+ s_b.sem_num = 0;
+ s_b.sem_op = 1;
+ s_b.sem_flg = 0;
+ 
+retry_init:
+ c = semop(sem_thread,&s_b,1);
+ if(c < 0){
+  if(errno == EINTR) goto retry_init;
+  perror("errore semop");
+  return -1;
+ }
+
+
+
+ for(int k = 0; k < n; k++){
+   array[k] = argv[k+1][0];
  }
  
- for(int z = 0; z < n; z++){
-  if(z > 0){
-retry_lock_main:
-   c_mutex = pthread_mutex_lock(&mutex[z]);
-   if( c_mutex < 0){
-    if(errno == EINTR) goto retry_lock_main;
-    perror("errore lock");
-    return -1;
-   }
-  }
-retry_lock_start:
-  c_mutex = pthread_mutex_lock(&mutex_start[z]);
-  if (c_mutex < 0){
-   if(errno == EINTR) goto retry_lock_start;
-   perror("errore lock");
-   return -1;
-  }
- }
-
-  m = mutex;
-  m_2 = mutex_start;
+ carattere = array;
 
  for(int y = 0; y < n; y++){
   d_thread[y].indice = y;
-  c_thread = pthread_create(&thread[y],NULL,funzione,(void*)&d_thread[y]);
-  if(c_thread < 0){
-   perror("errore pthread_create");
+  c = pthread_create(&thread[y],NULL,funzione,(void*)&d_thread[y]);
+  if (c < 0){
+    perror("errore pthread ");
+    return -1;
+  } 
+ }
+
+ signal(SIGINT,gestore);
+
+ while(1){
+
+  if(flag == 1){
+   flag = 0;
+   stampa();
+  }
+
+  printf("inserire stringa: ");
+  fflush(stdout);
+  s = fgets(buffer,MAX,stdin);
+  if( s == NULL){
+   perror("errore fgets");
+   return -1;
+  }
+  if(strlen(buffer) == MAX){
+   buffer[strlen(buffer) - 1] = '\0';
+   clear_stdin();
+  }
+ 
+  s_b.sem_num = 0;
+  s_b.sem_op = 1;
+  s_b.sem_flg = 0;
+
+retry_start:
+  c = semop(sem_start,&s_b,1);
+  if(c < 0){
+   if(errno == EINTR) goto retry_start;
+   perror("errore semop");
+   return -1;
+  }
+
+  s_b.sem_num = 0;
+  s_b.sem_op = -n;
+  s_b.sem_flg = 0;
+
+retry_wait:
+  c = semop(sem_done,&s_b,1);
+  if(c < 0){
+   if(errno == EINTR) goto retry_wait;
+   perror("errore semop");
    return -1;
   }
  }
 
- while(1){
-  for(int t = 0; t < n; t++){
-retry_start:
-   c_mutex = pthread_mutex_unlock(&mutex_start[t]);
-   if(c_mutex <0 ){
-    if(errno == EINTR) goto retry_start;
-    perror("errore lock");
-    break;
-   }
-  }
-   printf("inserire testo: ");
-   fflush(stdout);
-   c_gets = fgets(buffer,MAX,stdin);
-   if( c_gets == NULL){
-     perror("errore fgtes");
-     break;
-   }
-   buffer[strlen(buffer)-1] = '\0';
-retry_go:
-  c_mutex = pthread_mutex_lock(&mutex_go);
-  if(c_mutex < 0 ){
-   if(errno == EINTR) goto retry_go;
-    perror("errore lock");
-    break;
-   }
-  }
- }
-	return 0;
+ 	return 0;
 }
