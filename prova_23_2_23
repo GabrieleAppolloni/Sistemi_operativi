@@ -81,6 +81,7 @@ l'applicazione dovra' utilizzare non piu' del 5% della capacita' di lavoro della
 #define KEY 25
 #define KEY_2 15
 #define KEY_3 35
+#define KEY_4 45
 
 typedef struct{
 
@@ -93,6 +94,7 @@ struct sembuf s_b;
 int sem_thread;
 int sem_done;
 int sem_start;
+int sem_stampa;
 int n;
 char buffer[MAX];
 char* carattere;
@@ -109,6 +111,20 @@ void stampa(){
   int w;
   char* s_2;
 
+ s_b.sem_num = 0;
+ s_b.sem_op = -1;
+ s_b.sem_flg = 0;
+
+retry_stampa:
+ w = semop(sem_stampa,&s_b,1);
+ if (w < 0){
+  if(errno == EINTR) goto retry_stampa;
+  perror("errore semop");
+  return;
+ }
+
+
+
   f = fopen("output.txt","r");
   if(f == NULL){
    perror("errore fopen");
@@ -117,15 +133,18 @@ void stampa(){
 
   do{
      s_2 = fgets(b,MAX,f);
+    // printf("stringa dal file: %s \n",b);
      for(int i = 0; i < strlen(b); i++){
       if(b[i] == '*'){
-retry_w:
+       fprintf(stdout,"%s",b);
+        fflush(stdout);
+/*retry_w:
         w = write(1,b,strlen(b)+1);
         if(w < 0){
          if(errno == EINTR) goto retry_w;
          perror("errore write");
          return;
-        }
+        }*/
         break;
       }
      }
@@ -135,6 +154,22 @@ retry_w:
   fflush(stdout);
 
   fclose(f);
+
+ s_b.sem_num = 0;
+ s_b.sem_op = 1;
+ s_b.sem_flg = 0;
+
+retry_stampa_exit:
+ w = semop(sem_stampa,&s_b,1);
+ if (w < 0){
+  if(errno == EINTR) goto retry_stampa_exit;
+  perror("errore semop");
+  return;
+ }
+
+
+
+
 }
 void* funzione(void* x){
  int c_2;
@@ -155,6 +190,18 @@ retry_access:
    perror("errore semop");
    pthread_exit(NULL);
   }
+
+ s_b.sem_num = 0;
+ s_b.sem_op = -1;
+ s_b.sem_flg = 0;
+
+retry_stampa_check:
+ w = semop(sem_stampa,&s_b,1);
+ if (w < 0){
+  if(errno == EINTR) goto retry_stampa_check;
+  perror("errore semop");
+  pthread_exit(NULL);
+ }
 
   if(pos == 0){
 
@@ -177,14 +224,14 @@ retry_restart:
   printf("ho letto %s \n",buff);
   fflush(stdout);
 
-  for(int i = 0; i < (strlen(buff)); i++){
-   if(buff[i] == carattere[pos] ) buff[i] = '*';
+  for(int i = 0; i < (strlen(buffer)); i++){
+   if(buffer[i] == carattere[pos] ) buffer[i] = '*';
   }
 
-  printf("la nuova stringa: %s \n",buff);
+  printf("la nuova stringa: %s \n",buffer);
 
 retry_write:
-  w = write(fd,buff,strlen(buff)+1);
+  w = write(fd,buff,strlen(buffer));
   if(w < 0){
    if(errno == EINTR) goto retry_write;
     perror("errore write");
@@ -192,7 +239,7 @@ retry_write:
   }
 
 retry_write_2:
-  w = write(fd,buffer,strlen(buffer)+1);
+  w = write(fd,buffer,strlen(buff));
   if(w < 0){
    if(errno == EINTR) goto retry_write;
     perror("errore write");
@@ -211,6 +258,18 @@ retry_add:
    perror("errore semop");
    pthread_exit(NULL);
   }
+
+ s_b.sem_num = 0;
+ s_b.sem_op = 1;
+ s_b.sem_flg = 0;
+
+retry_stampa_check_2:
+ w = semop(sem_stampa,&s_b,1);
+ if (w < 0){
+  if(errno == EINTR) goto retry_stampa_check_2;
+  perror("errore semop");
+  pthread_exit(NULL);
+ }
 
 
 
@@ -258,7 +317,7 @@ int main(int argc, char** argv){
   }
  }
  
- fd = open("output.txt",O_CREAT|O_TRUNC|O_RDWR,0666);
+ fd = open("output.txt",O_CREAT|O_TRUNC|O_WRONLY,0666);
  if(fd < 0){
   perror("errore open");
   return -1;
@@ -268,11 +327,18 @@ int main(int argc, char** argv){
  sem_thread = semget(KEY,n,IPC_CREAT|0666);
  sem_done =semget(KEY_2,1,IPC_CREAT|0666);
  sem_start = semget(KEY_3,1,IPC_CREAT|0666);
+ sem_stampa = semget(KEY_4,1,IPC_CREAT|0666);
 
- if( sem_thread < 0 || sem_done < 0 || sem_start < 0 ){
+ if( sem_thread < 0 || sem_done < 0 || sem_start < 0 || sem_stampa < 0 ){
   perror("errore semget");
   return -1;
  }
+ 
+ c = semctl(sem_stampa,0,SETVAL,1);
+ if(c < 0){
+   perror("errore semctl");
+   return -1;
+  }
 
  c = semctl(sem_start,0,SETVAL,0); 
  if(c < 0){
