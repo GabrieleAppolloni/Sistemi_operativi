@@ -316,7 +316,7 @@ int main(int argc, char** argv){
     }
   }
  }
- 
+//andrebbe controllato che la stringa passata sia di 1 carattere 
  fd = open("output.txt",O_CREAT|O_TRUNC|O_WRONLY,0666);
  if(fd < 0){
   perror("errore open");
