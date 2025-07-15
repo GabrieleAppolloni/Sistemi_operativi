@@ -238,6 +238,9 @@ retry_write:
     pthread_exit(NULL);
   }
 
+ write(fd,"\n",1);
+ 
+
 retry_write_2:
   w = write(fd,buffer,strlen(buff));
   if(w < 0){
@@ -245,6 +248,8 @@ retry_write_2:
     perror("errore write");
     pthread_exit(NULL);
   }
+
+   write(fd,"\n",1); 
 
 
   s_b.sem_num = 0;
@@ -316,7 +321,7 @@ int main(int argc, char** argv){
     }
   }
  }
-//andrebbe controllato che la stringa passata sia di 1 carattere 
+ 
  fd = open("output.txt",O_CREAT|O_TRUNC|O_WRONLY,0666);
  if(fd < 0){
   perror("errore open");
@@ -405,6 +410,7 @@ retry_init:
    perror("errore fgets");
    return -1;
   }
+  buffer[strcspn(buffer,"\n")] = '\0';
   if(strlen(buffer) == MAX){
    buffer[strlen(buffer) - 1] = '\0';
    clear_stdin();
